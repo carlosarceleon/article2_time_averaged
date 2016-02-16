@@ -1,3 +1,125 @@
+DaVis_orientaion_to_standard_dict = {
+    'x':                                 'y',
+    'y':                                 'x',
+    'v':                                 'u',
+    'u':                                 'v',
+    'w':                                 'w',
+    'u_rms':                             'v_rms',
+    'v_rms':                             'u_rms',
+    'w_rms':                             'w_rms',
+    "Reynold_stress_uv":                 'Reynold_stress_uv',
+    "Reynold_stress_uw":                 "Reynold_stress_vw",
+    "Reynold_stress_vw":                 "Reynold_stress_uw",
+    "Reynold_stress_uu":                 "Reynold_stress_vv",
+    "Reynold_stress_vv":                 'Reynold_stress_uu',
+    "Reynold_stress_ww":                 'Reynold_stress_ww',
+    "Length of Avg V":                   "Length of Avg V",
+    "Length of Standard deviation of V": "Length of RMS V",
+    "Length of RMS V":                   "Length of RMS V",
+    "case_name":                         "case_name",
+}
+
+def read_davis_tecplot_folder_and_rotate_to_serration_surface(tecplot_folder,
+                                                             plot = False):
+    """Reads in a tecplot folder, given, and returns a pandas data frame
+    that is rotated to the airfoil surface as specified in the mask
+
+    """
+    import pandas as pd 
+    import re
+    from os import listdir
+    from os.path import split,join
+    from Masks import Masks as masks
+    from numpy import array
+
+    tecplot_files = [f for f in listdir(tecplot_folder) \
+                     if f.endswith('.dat')]
+
+    for tecplot_file in tecplot_files:
+
+        # Get available variables
+        f = open(join(tecplot_folder,tecplot_file),'ro')
+        var_flag = False
+        dev_flag = False
+        for line in f:
+            string = re.findall("^VARIABLES[ _A-Za-z0-9,\"=]+",line)
+            if string:
+                variables = [v.replace(' ','_').replace("\"","") \
+                             for v in string[0].replace("VARIABLES = ",'')\
+                             .split(", ")]
+                variables = [v for v in variables if len(v)]
+                var_flag = True
+            string = re.findall("^TITLE = [ -_A-Za-z0-9,\"=]+",line)
+            if string:
+                dev_flag = True
+            if var_flag and dev_flag:
+                break
+        f.close()
+
+        # Put the data into a data frame #######################################
+        data = pd.read_table(
+                join(tecplot_folder,tecplot_file),
+                skiprows  = 4,
+                names     = variables,
+                sep       = '[ \t]+',
+                index_col = False
+                )
+        if tecplot_file == tecplot_files[0]:
+            df = data.copy()
+        else:
+            variable = data.drop(['x','y'],1).columns[0]
+            df[variable] = data[variable]
+        # ######################################################################
+
+    df = rename_df_columns_from_DaVis_to_standard(df)
+
+    trailing_edge,phi,alpha,U,z = decript_case_name(split(tecplot_folder)[-1])
+
+    if trailing_edge == 'serrated': device = 'Sr20R21'
+    elif trailing_edge == 'straight': device = 'STE'
+
+    df['case_name'] = "{0}_phi{1}_alpha{2}_U{3}_loc{4}_even_newer.dat".format(
+        device, phi, alpha, U, z
+    )
+
+    mask = array(masks[df.case_name.unique()[0]])
+
+
+    df.x = df.x - mask[1,0]
+    df.y = df.y - mask[1,1]
+
+    data_shape = (
+        len(df.y.unique()),len(df.x.unique())
+    )
+    print data_shape
+
+    mask_rotation = get_angle_between_points(
+        mask[1], mask[2]
+    )
+
+    df = rotate_df( df, mask_rotation )
+
+    # Regrid ###################################################################
+    df = regrid_df(
+        df, 
+        variables = df.columns,
+        resolution = data_shape
+    )
+    ######################################################################
+
+    # Rotate variables to the standard coordinate system ###################
+    #rotated_variables = [ DaVis_orientaion_to_standard_dict[v] \
+    #                     for v in df.columns]
+    #df.columns = rotated_variables
+    # ######################################################################
+
+    if plot:
+        show_surface_from_df(df,variable = 'u')
+
+
+    df.to_pickle("data/{0}.p".format(df.case_name.unique()[0]))
+
+
 def NACA0018_trailing_edge_profile():
     from numpy import array
 
@@ -46,31 +168,72 @@ def NACA0018_trailing_edge_profile():
 
     return array([upper_side_surface_x[::-1], upper_side_surface_y[::-1]])
 
+def get_vorticity(df):
+    from numpy import shape,zeros
+    from sys import exit
+
+    if "vorticity_xy" in df.columns:
+        # Do nothing and return the same DF
+        return df
+
+    # Get shape of 2D plane
+    nx = len(df['x'].unique())
+    ny = len(df['y'].unique())
+    Ux = df['u'].values.reshape((ny,nx))
+    Uy = df['v'].values.reshape((ny,nx))
+    ax = df['x'].values.reshape((ny,nx))/1000. # [mm] -> [m]
+    ay = df['y'].values.reshape((ny,nx))/1000. # [mm] -> [m]
+
+    i,j = shape(Ux)
+
+    # Sanity check:
+    if i != shape(Uy)[0] or i != shape(ax)[0] or i != shape(ay)[0]:
+        exit("   The shape of the matrices while getting the "+\
+             "vorticity is not the same!")
+
+    duy_dax = zeros((i,j))
+    dux_day = zeros((i,j))
+    for ii in range(1,i-1):
+        for jj in range(1,j-1):
+            duy_dax[ii,jj] = (Uy[ii,jj+1]-Uy[ii,jj-1])\
+                    /(ax[ii,jj+1]-ax[ii,jj-1])
+    for ii in range(1,i-1):
+        for jj in range(1,j-1):
+            dux_day[ii,jj] = (Ux[ii+1,jj]-Ux[ii-1,jj])\
+                    /(ay[ii+1,jj]-ay[ii-1,jj])
+
+    vorticity = duy_dax - dux_day
+
+    df['vorticity_xy'] = vorticity.ravel()
+
+    return df
 
 
 def rename_df_columns_from_DaVis_to_standard(df):
     DaVis_naming_dict= {
-          "x"                            : "x",
-          "y"                            : "y",
-          "Avg_Vx"                       : "u",
-          "Avg_Vy"                       : "v",
-          "Avg_Vz"                       : "w",
-          "Length_of_Avg_V"                 : "Length of Avg V",
-          "RMS_Vx"                       : "u_rms",
-          "RMS_Vy"                       : "v_rms",
-          "RMS_Vz"                       : "w_rms",
+          "x"                                 : "x",
+          "y"                                 : "y",
+          "Avg_Vx"                            : "u",
+          "Avg_Vy"                            : "v",
+          "Avg_Vz"                            : "w",
+          "RMS_Vx"                            : "u_rms",
+          "RMS_Vy"                            : "v_rms",
+          "RMS_Vz"                            : "w_rms",
+          "Reynold_stress_XY"                 : "Reynold_stress_uv",
+          "Reynold_stress_XZ"                 : "Reynold_stress_uw",
+          "Reynold_stress_YZ"                 : "Reynold_stress_vw",
+          "Reynold_stress_XX"                 : "Reynold_stress_uu",
+          "Reynold_stress_YY"                 : "Reynold_stress_vv",
+          "Reynold_stress_ZZ"                 : "Reynold_stress_ww",
+          "Length_of_Avg_V"                   : "Length of Avg V",
           "Length_of_Standard_deviation_of_V" : "Length of RMS V",
-          "Reynold_stress_XY"            : "Reynold_stress_uv",
-          "Reynold_stress_XZ"            : "Reynold_stress_uw",
-          "Reynold_stress_YZ"            : "Reynold_stress_vw",
-          "Reynold_stress_XX"            : "Reynold_stress_uu",
-          "Reynold_stress_YY"            : "Reynold_stress_vv",
-          "Reynold_stress_ZZ"            : "Reynold_stress_ww",
+          "Length_of_RMS_V"                   : "Length of RMS V",
           }
 
-    df.columns = [
-        DaVis_naming_dict[col] for col in df.columns
-    ]
+    if not "Length_of_Avg_V" in df.columns:
+        return df
+
+    df.columns = [ DaVis_naming_dict[col] for col in df.columns ]
 
     return df
 
@@ -110,11 +273,14 @@ def regrid_df(df,variables,resolution=[0]):
                     int(df['y'].min())-1:int(df['y'].max()+1):resolution[1]*1j,
                     int(df['x'].min())-1:int(df['x'].max()+1):resolution[0]*1j,
                     ]
+
     df_interpolated = pd.DataFrame({
             'x' : grid_x.ravel(),
             'y' : grid_y.ravel(),
             })
     
+    variables = [v for v in variables if not v in string_columns \
+                 and not v == 'x' and not v == 'y']
     for v in variables:
         grid_var = griddata(
                 (df['x'].values,df['y'].values), 
@@ -131,11 +297,15 @@ def regrid_df(df,variables,resolution=[0]):
     df_interpolated.x = df_interpolated.x - \
             find_nearest(0,df_interpolated.x.values)
 
-    for col in string_columns.columns:
-        df_interpolated[col] = df[col].unique()[0]
+    if len(string_columns):
+        for col in string_columns.columns:
+            df_interpolated[col] = df[col].unique()[0]
 
-    df_interpolated.fillna(0)
+    if len(string_columns):
+        for sc in string_columns:
+            df_interpolated[sc] = df[sc].unique()[0]
 
+    df_interpolated = df_interpolated.fillna(0)
     return df_interpolated
 
 def rotate_polygon(polygon,theta):
@@ -168,15 +338,17 @@ def mask_orientation_from_DaVis_to_standard(mask):
 
     return array([mask_x_rot , mask_y_rot])
 
-def return_mask(case_name):
+def return_mask(case_name,zero_at_TE = True, coordinates = 'standard'):
     from Masks import Masks as masks
     from numpy import array
 
     mask = array(masks[case_name])
 
-    mask = mask - mask[1]
+    if zero_at_TE:
+        mask = mask - mask[1]
     mask = mask.T
-    mask = mask_orientation_from_DaVis_to_standard(mask)
+    if not coordinates == 'DaVis':
+        mask = mask_orientation_from_DaVis_to_standard(mask)
 
     return mask
 
@@ -201,10 +373,13 @@ def show_surface_from_df(df, variable=[], points = [], mask = []):
     from numpy import meshgrid,linspace
 
     if len(df.x.unique())>1000:
-        df = regrid_df(df,variables=df.columns)
+
+        df = regrid_df( df , variables = [variable]+['u','v'], 
+                       resolution = [0.1])
 
     X,Y = meshgrid( df.x.unique() , df.y.unique() )
     Z   = df[variable].reshape(X.shape)
+
     U   = df['u'].reshape(X.shape)
     V   = df['v'].reshape(X.shape)
 
@@ -403,13 +578,28 @@ def decript_case_name(case_name):
     if trailing_edge == "STE" : trailing_edge = 'straight'
     if trailing_edge == "Sr20R21" : trailing_edge = 'serrated'
 
-    phi   = findall('phi[0-9]',case_name)[0].replace('phi','')
-    alpha = findall('alpha[0-9][0-9]?',case_name)[0].replace('alpha','')
-    U     = findall('U[0-9][0-9]',case_name)[0].replace('U','')
-    z     = findall('loc[0-9][0-9]',case_name)[0].replace('loc','')
-    if   z == '00' : z = '0'
-    elif z == '05' : z = '0.25'
-    elif z == '10' : z = '0.5'
+    phi = 0 ; alpha = 0 ; U = 0 ; z = 0
+
+    try:
+        phi   = findall('phi[0-9]',case_name)[0].replace('phi','')
+        alpha = findall('alpha[0-9][0-9]?',case_name)[0].replace('alpha','')
+        z     = findall('loc[0-9][0-9]',case_name)[0].replace('loc','')
+
+        if   z == '00' : z = '0'
+        elif z == '05' : z = '0.25'
+        elif z == '10' : z = '0.5'
+
+    except:
+        # In case it's the DaVis naming convention ############################
+        if not phi:
+            phi   = findall('p[0-9]',case_name)[0].replace('p','')
+        if not alpha:
+            alpha = findall('a[0-9][0-9]?',case_name)[0].replace('a','')
+        if not z:
+            z     = findall('z[0-9][0-9]',case_name)[0].replace('z','')
+        # #####################################################################
+
+    U = findall('U[0-9][0-9]',case_name)[0].replace('U','')
 
     return trailing_edge,phi,alpha,U,z
 
@@ -423,8 +613,9 @@ def load_df_from_pickle(pickle_file):
 
     df = df.fillna(value=0)
     
-    df['case_name'] = os.path.split(pickle_file)[1]\
-            .replace('_rotated.p','')
+    if not 'case_name' in df.columns:
+        df['case_name'] = os.path.split(pickle_file)[1]\
+                .replace('_rotated.p','')
 
     trailing_edge, phi, alpha, U, z = decript_case_name(pickle_file)
 
@@ -476,7 +667,7 @@ def get_wall_normal_line(pickle_file, x_loc,
     mask = rotate_polygon(mask, rotation_angle+mask_rotation)
 
     data_shape = (
-        len(df[df.y>0].x.unique()),len(df[df.y>0].y.unique())
+        len(df.x.unique()),len(df.y.unique())
     )
 
     df = correct_flow_plane_df(
@@ -500,6 +691,8 @@ def get_wall_normal_line(pickle_file, x_loc,
         resolution = data_shape
     )
     ######################################################################
+
+    df = get_vorticity(df)
 
     if plot:
 
@@ -576,10 +769,10 @@ def get_dimensionless_inner_variables(df,correction=0,Cf = 0):
     mu  = 1.813e-5
     nu  = mu / rho
     
-    U_inf = df.u.max()
+    U_e = get_edge_velocity(df)
 
     # Reynolds number
-    Re = get_Reynolds_number( U = U_inf )
+    Re = get_Reynolds_number( U = U_e )
     if not Cf:
         # Friction coefficient, accordint to the 7th power law
         Cf = 0.074 / Re**0.2
@@ -590,7 +783,7 @@ def get_dimensionless_inner_variables(df,correction=0,Cf = 0):
         # Self
         Cf = 0.00113
     # Wall shear, approximated
-    tau_w = Cf * 0.5 * rho * U_inf**2
+    tau_w = Cf * 0.5 * rho * U_e**2
     # Wall shear velocity, approximated
     u_tau = sqrt( tau_w / rho )
     # Viscous length scale
@@ -632,4 +825,107 @@ def write_to_csv_with_units(df,csv_file_name):
     df.columns = new_columns
 
     df.to_csv(csv_file_name)
+
+def get_edge_velocity(df, 
+                      condition = 'vorticity_integration_rate_of_change', 
+                      threshold = 1.00
+                     ):
+    from scipy.integrate import simps
+    from numpy import diff
+    
+    U_edge = 0 
+
+    df = df.sort_values( by = 'y', ascending = True )
+    df = df[df.y>5]
+    df = df.reset_index(drop=True)
+
+    # Get the integrated vorticity #############################################
+    integration_result = []
+    for i in range(len(df.y)):
+        integration_result.append(
+            - simps(df.vorticity_xy.ix[:i], 
+                  x=df.y.ix[:i]/1000., 
+                  even='avg'
+                 )
+        )
+    df['vorticity_integration'] = integration_result
+    rate_of_change = diff(df.vorticity_integration)/diff(df.y/1000.)
+    rate_of_change = list(rate_of_change) + [rate_of_change[-1]]
+    df['vorticity_integration_rate_of_change'] = rate_of_change
+            
+    ############################################################################
+
+    # Get the rms rates of vertical change #####################################
+    df['u_rms_rate_of_change'] = list(diff(df.u_rms)/diff(df.y/1000.))+[0]
+    df['v_rms_rate_of_change'] = list(diff(df.v_rms)/diff(df.y/1000.))+[0]
+    ############################################################################
+
+    while not U_edge:
+        for y_loc in df.iterrows():
+            if y_loc[1][condition] < threshold:
+                U_edge = y_loc[1]['u']
+                break
+
+        if not U_edge:
+            print "   Warning, couldn't still find U_edge based on {0}"\
+                    .format(condition)
+            threshold += 1
+            print "   ...increasing the threshold by 1 to {0}".format(threshold)
+
+    return U_edge
+
+def write_boundary_layers(df, 
+                          boundary_layers_file = 'boundary_layers_file.csv'):
+    import pandas as pd
+    from os.path import isfile
+
+    trailing_edge,phi,alpha,U,z = decript_case_name(df.case_name.unique()[0])
+
+    def get_delta_99(df,U_e):
+        df = df.append( {'u' : 0.99*U_e} , ignore_index = True)
+        df = df.sort_values( by = 'u' )
+        df = df.apply(pd.Series.interpolate)
+        return df[ df.u == 0.99*U_e ].y.values[0]
+
+    def get_delta_displacement(df,U_e):
+        from scipy.integrate import simps
+        return simps(
+            ( df.u / U_e ) * (1 - df.u / U_e ), 
+            x=df.y , 
+            even='avg'
+        )
+
+    def get_delta_momentum(df,U_e):
+        from scipy.integrate import simps
+        return simps(
+            1 - df.u / U_e , 
+            x=df.y , 
+            even='avg'
+        )
+
+    U_e = get_edge_velocity(df)
+
+    delta_99           = get_delta_99(df,U_e)
+    delta_displacement = get_delta_displacement(df,U_e)
+    delta_momentum     = get_delta_momentum(df,U_e)
+
+    case_bl_df = pd.DataFrame( data = 
+                              {'trailing_edge':      trailing_edge,
+                               'phi':                phi,
+                               'alpha':              alpha,
+                               'z':                  z,
+                               'delta_99':           delta_99,
+                               'delta_displacement': delta_displacement,
+                               'delta_momentum':     delta_momentum,
+                               'x_loc':              df.x_loc.unique()[0]
+                              }, index = [0]
+                             )
+
+    if isfile(boundary_layers_file):
+        bl_df = pd.read_csv(boundary_layers_file)
+        bl_df = bl_df.append( case_bl_df )
+        bl_df = bl_df.drop_duplicates()
+        bl_df.to_csv( boundary_layers_file , index=False)
+    else:
+        case_bl_df.to_csv( boundary_layers_file , index=False)
 

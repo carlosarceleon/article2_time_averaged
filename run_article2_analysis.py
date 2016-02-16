@@ -1,4 +1,5 @@
 import case_dict_overall_correction as case_dict
+import publish
 
 cases_df = case_dict.return_case_df()
 #markers = ['o', 'v',  's', 'p', '^', '<', '>', '8',
@@ -21,7 +22,7 @@ def get_streamlined_surface(z_loc = 0):
         'data/STE_phi0_alpha0_U20_loc00.dat_rotated.p',
         'data/Sr20R21_phi0_alpha0_U20_loc00.dat_rotated.p',
         'data/Sr20R21_phi0_alpha0_U20_loc05.dat_rotated.p',
-        'data/Sr20R21_phi0_alpha0_U20_loc10_Reprocessed.dat_rotated.p',
+        'data/Sr20R21_phi0_alpha0_U20_loc10_even_newer.dat.p',
     ]
     plot_names = [
         'SurfacePlot_u_Straight_edge.png',
@@ -86,7 +87,7 @@ def write_wall_normal_lines_to_csv():
 
     case_z10 = cases_df[ 
         (cases_df.file == \
-         'data/Sr20R21_phi0_alpha0_U20_loc10_Reprocessed.dat_rotated.p')&\
+         'data/Sr20R21_phi0_alpha0_U20_loc10_even_newer.dat.p')&\
         (cases_df.x_loc == 0) ]
 
     cases = case_STE
@@ -139,7 +140,7 @@ def get_trailing_edge_for_all_cases_at_TE_m1():
         (cases_df.x_loc == 19) ]
     case_z10 = cases_df[ 
         (cases_df.file == \
-         'data/Sr20R21_phi0_alpha0_U20_loc10_Reprocessed.dat_rotated.p')&\
+         'data/Sr20R21_phi0_alpha0_U20_loc10_even_newer.dat.p')&\
         (cases_df.x_loc == -1) ]
 
     cases = case_STE
@@ -147,7 +148,11 @@ def get_trailing_edge_for_all_cases_at_TE_m1():
     cases = cases.append(case_z05)
     cases = cases.append(case_z10)
 
-    plot_cases( cases , plot_name = "At_trailing_edge")
+    schematic = '/home/carlos/Documents/PhD/Articles/Article_2/'+\
+            'Figures/measurement_locations_TE_m2.png'
+
+    write_boundary_layers(cases)
+    plot_cases( cases , plot_name = "At_trailing_edge", schematic = schematic)
 
 def get_trailing_edge_for_all_cases_at_x_m1():
 
@@ -162,7 +167,7 @@ def get_trailing_edge_for_all_cases_at_x_m1():
         (cases_df.x_loc == -1) ]
     case_z10 = cases_df[ 
         (cases_df.file == \
-         'data/Sr20R21_phi0_alpha0_U20_loc10_Reprocessed.dat_rotated.p')&\
+         'data/Sr20R21_phi0_alpha0_U20_loc10_even_newer.dat.p')&\
         (cases_df.x_loc == -1) ]
 
     cases = case_STE
@@ -170,18 +175,26 @@ def get_trailing_edge_for_all_cases_at_x_m1():
     cases = cases.append(case_z05)
     cases = cases.append(case_z10)
 
-    plot_cases( cases , plot_name = "At_x_m1")
+    schematic = '/home/carlos/Documents/PhD/Articles/Article_2/'+\
+            'Figures/measurement_locations_x0_m2.png'
 
-def plot_cases(cases,plot_name = ''):
+    write_boundary_layers(cases)
+    plot_cases( cases , plot_name = "At_x_m1", schematic = schematic)
+
+def plot_cases(cases,plot_name = '', schematic = ''):
     import article2_time_averaged_routines as tar
     import matplotlib.pyplot as plt
     from matplotlib import rc
     import seaborn as sns
     from numpy import linspace,log,diff
     import pandas as pd
+    from matplotlib.cbook import get_sample_data
+    from os.path import isfile,split,splitext
 
-    markeredgewidth = 1
+    markeredgewidth = 2
     markerfacecolor = 'none'
+    markersize      = 12
+    mew             = 4 # Marker edge width
 
     """ Cite
     Nagano1998
@@ -192,16 +205,24 @@ def plot_cases(cases,plot_name = ''):
     rc('font',weight='normal')
 
     sns.set_context('paper')
-    sns.set(font='serif',font_scale=1.6,style='whitegrid')
-    rc('font',family='serif', serif='cm10')
+    sns.set(font='serif',font_scale=3.0,style='whitegrid')
+    rc('font',family='serif', serif='Linux Libertine')
 
-    fig_nondim   , axes_nondim   = plt.subplots(1,1,sharex=True,sharey=True)
-    fig_u        , axes_u        = plt.subplots(1,1,sharex=True,sharey=True)
-    fig_v        , axes_v        = plt.subplots(1,1,sharex=True,sharey=True)
-    fig_diff     , axes_diff     = plt.subplots(1,1,sharex=True,sharey=True)
-    fig_diff_rms , axes_diff_rms = plt.subplots(1,1,sharex=True,sharey=True)
-    fig_u_rms    , axes_u_rms    = plt.subplots(1,1,sharex=True,sharey=True)
-    fig_v_rms    , axes_v_rms    = plt.subplots(1,1,sharex=True,sharey=True)
+    figsize = (7,6)
+    fig_nondim   , axes_nondim   = plt.subplots(1,1,sharex=True,sharey=True,
+                                                figsize=figsize )
+    fig_u        , axes_u        = plt.subplots(1,1,sharex=True,sharey=True,
+                                                figsize=figsize )
+    fig_v        , axes_v        = plt.subplots(1,1,sharex=True,sharey=True,
+                                                figsize=figsize )
+    fig_diff     , axes_diff     = plt.subplots(1,1,sharex=True,sharey=True,
+                                                figsize=figsize )
+    fig_diff_rms , axes_diff_rms = plt.subplots(1,1,sharex=True,sharey=True,
+                                                figsize=figsize )
+    fig_u_rms    , axes_u_rms    = plt.subplots(1,1,sharex=True,sharey=True,
+                                                figsize=figsize )
+    fig_v_rms    , axes_v_rms    = plt.subplots(1,1,sharex=True,sharey=True,
+                                                figsize=figsize )
 
     df_all_cases = pd.DataFrame()
 
@@ -210,113 +231,134 @@ def plot_cases(cases,plot_name = ''):
     for case,marker,color in zip(cases.iterrows(),markers,palette):
         print "Processing {0}".format(case[1].file)
 
-        df = tar.get_wall_normal_line(
-            pickle_file               = case[1].file,
-            x_loc                     = case[1].x_loc,
-            variable                  = ['u','v',"u_rms","v_rms",],
-            plot                      = False,
-            rotation_angle            = case[1].rotation,
-            trust_y_min               = case[1].y_trust_min,
-            height_correction         = case[1].height_correction,
-            streamwise_correction     = case[1].x_corr,
+        df_pickle_name = "ReservedData/{0}_{1}_{2}_{3}_{4}.p".format(
+            splitext(split(case[1].file)[1])[0],
+            case[1].x_loc,
+            case[1].rotation,
+            case[1].height_correction,
+            case[1].x_corr
         )
 
+        if isfile(df_pickle_name):
+            df = pd.read_pickle(df_pickle_name)
+            print df_pickle_name
+        else:
+            df = tar.get_wall_normal_line(
+                pickle_file               = case[1].file,
+                x_loc                     = case[1].x_loc,
+                variable                  = ['u','v',"u_rms","v_rms",],
+                plot                      = False,
+                rotation_angle            = case[1].rotation,
+                trust_y_min               = case[1].y_trust_min,
+                height_correction         = case[1].height_correction,
+                streamwise_correction     = case[1].x_corr,
+            )
 
         df = tar.get_dimensionless_inner_variables(
             df,
             correction = 0,
             Cf = case[1].Cf,
-            #correction = -3.6
         )
+
+        U_e = tar.get_edge_velocity(df)
+
         axes_nondim.plot(
             df.y_plus,
             df.u_plus,
             label = case[1].case_name,
-            marker = marker,
-            markeredgewidth=markeredgewidth,
+            marker = case[1].marker,
+            markeredgewidth = markeredgewidth,
             markerfacecolor = markerfacecolor,
             markeredgecolor = color,
-            color = color,
+            markersize      = markersize,
+            mew             = mew,
+            color = [float(f) for f in case[1].color.split(',')]
         )
         axes_u.plot(
             #df.u/20.,
-            df.u/df.u.max(),
+            df.u/U_e,
             df.y,
             label = case[1].case_name,
-            marker = marker,
+            marker = case[1].marker,
             markeredgewidth=markeredgewidth,
             markerfacecolor = markerfacecolor,
             markeredgecolor = color,
-            color = color,
+            markersize      = markersize,
+            mew             = mew,
+            color = [float(f) for f in case[1].color.split(',')]
         )
 
         axes_u_rms.plot(
-            df.u_rms/df.u.max(),
+            df.u_rms/U_e,
             df.y,
             label = case[1].case_name,
-            marker = marker,
+            marker = case[1].marker,
             markeredgewidth=markeredgewidth,
             markerfacecolor = markerfacecolor,
             markeredgecolor = color,
-            color = color,
+            markersize      = markersize,
+            mew             = mew,
+            color = [float(f) for f in case[1].color.split(',')]
         )
 
         axes_v_rms.plot(
-            df.v_rms/df.u.max(),
+            df.v_rms/U_e,
             df.y,
             label = case[1].case_name,
-            marker = marker,
+            marker = case[1].marker,
             markeredgewidth=markeredgewidth,
             markerfacecolor = markerfacecolor,
             markeredgecolor = color,
-            color = color,
+            markersize      = markersize,
+            mew             = mew,
+            color = [float(f) for f in case[1].color.split(',')]
         )
 
         axes_diff.plot(
             df.y.values[0:-1],
             diff(df.u)/diff(df.y),
             label = case[1].case_name,
-            marker = marker,
+            marker = case[1].marker,
             markeredgewidth=markeredgewidth,
             markerfacecolor = markerfacecolor,
             markeredgecolor = color,
-            color = color,
+            markersize      = markersize,
+            mew             = mew,
+            color = [float(f) for f in case[1].color.split(',')]
         )
         
         axes_diff_rms.plot(
             df.y.values[0:-1],
             diff(df.u_rms)/diff(df.y),
             label = case[1].case_name,
-            marker = marker,
+            marker = case[1].marker,
             markeredgewidth=markeredgewidth,
             markerfacecolor = markerfacecolor,
             markeredgecolor = color,
-            color = color,
+            markersize      = markersize,
+            mew             = mew,
+            color = [float(f) for f in case[1].color.split(',')]
         )
 
         axes_v.plot(
             df.v/20.,
             df.y+case[1].rotation,
             label = case[1].case_name,
-            marker = marker,
+            marker = case[1].marker,
             markeredgewidth=markeredgewidth,
             markerfacecolor = markerfacecolor,
             markeredgecolor = color,
-            color = color,
+            markersize      = markersize,
+            mew             = mew,
+            color = [float(f) for f in case[1].color.split(',')]
         )
 
         df_all_cases = df_all_cases.append(
             df,
             ignore_index=True
         )
-
-    axes_nondim.legend(
-        bbox_to_anchor = (0., 1.02, 1.0, .102),
-        loc            = 3,
-        ncol           = 2,
-        mode           = "expand",
-        borderaxespad  = 0.
-    )
+        if not isfile(df_pickle_name):
+            df.to_pickle(df_pickle_name)
 
     # Plot u_plus = y_plus law
     line = axes_nondim.plot(
@@ -338,60 +380,61 @@ def plot_cases(cases,plot_name = ''):
     axes_nondim.set_xlim(1e0, 1e3)
     axes_nondim.xaxis.grid(True, which='minor')
 
-    axes_u.legend(
-        bbox_to_anchor = (0., 1.02, 1.0, .102),
-        loc            = 3,
-        ncol           = 2,
-        mode           = "expand",
-        borderaxespad  = 0.
-    )
-    axes_v.legend(
-        bbox_to_anchor = (0., 1.02, 1.0, .102),
-        loc            = 3,
-        ncol           = 2,
-        mode           = "expand",
-        borderaxespad  = 0.
-    )
-    axes_v_rms.legend(
-        bbox_to_anchor = (0., 1.02, 1.0, .102),
-        loc            = 3,
-        ncol           = 2,
-        mode           = "expand",
-        borderaxespad  = 0.
-    )
-    axes_u_rms.legend(
-        bbox_to_anchor = (0., 1.02, 1.0, .102),
-        loc            = 3,
-        ncol           = 2,
-        mode           = "expand",
-        borderaxespad  = 0.
-    )
-    axes_diff.legend(
-        bbox_to_anchor = (0., 1.02, 1.0, .102),
-        loc            = 3,
-        ncol           = 2,
-        mode           = "expand",
-        borderaxespad  = 0.
-    )
-    axes_diff_rms.legend(
-        bbox_to_anchor = (0., 1.02, 1.0, .102),
-        loc            = 3,
-        ncol           = 2,
-        mode           = "expand",
-        borderaxespad  = 0.
-    )
+    list_of_axes = [
+        axes_u,
+        axes_v,
+        axes_v_rms,
+        axes_u_rms,
+        axes_diff,
+        axes_diff_rms,
+        axes_nondim,
+    ]
 
-    axes_u.set_xlabel("$u/U_\\infty$")
+    list_of_figures = [
+        fig_u,
+        fig_v,
+        fig_v_rms,
+        fig_u_rms,
+        fig_diff,
+        fig_diff_rms,
+        fig_nondim,
+    ]
+
+    if not schematic:
+        for ax in list_of_axes:
+            ax.legend(
+                bbox_to_anchor = (0., 1.02, 1.0, .102),
+                loc            = 3,
+                ncol           = 2,
+                mode           = "expand",
+                borderaxespad  = 0.
+            )
+
+    if schematic:
+        im = plt.imread( get_sample_data( schematic  ) )
+        for fig in list_of_figures:
+            if fig == fig_v_rms or fig == fig_u_rms :
+                newax = fig.add_axes([0.65, 0.55, 0.3, 0.3], anchor = 'SW', 
+                                     zorder=15)
+            else:
+                newax = fig.add_axes([0.175, 0.55, 0.3, 0.3], anchor = 'SW', 
+                                     zorder=15)
+            newax.imshow(im)
+            newax.axis('off')
+
+    axes_u.set_xlabel("$\overline u/U_\\infty$")
     axes_u.set_ylabel("$y$ [mm]")
     axes_u.set_xlim(0, 1)
-    axes_v.set_xlabel("$v/U_\\infty$")
+    axes_v.set_xlabel("$\overline v/U_\\infty$")
     axes_v.set_ylabel("$y$ [mm]")
     axes_u_rms.set_xlabel("$u'_\\textrm{rms}/U_\\infty$")
     axes_u_rms.set_ylabel("$y$ [mm]")
+    axes_u_rms.set_xlim(0,0.12)
     axes_v_rms.set_xlabel("$v'_\\textrm{rms}/U_\\infty$")
     axes_v_rms.set_ylabel("$y$ [mm]")
+    axes_v_rms.set_xlim(0,0.12)
     axes_diff.set_xlabel("$y$ [mm]")
-    axes_diff.set_ylabel("$\\partial u/ \\partial y$")
+    axes_diff.set_ylabel("$\\partial \overline u/ \\partial y$")
     axes_diff.set_yscale("log")
     axes_diff_rms.set_xlabel("$y$ [mm]")
     axes_diff_rms.set_ylabel("$\\partial u'_\\textrm{rms}/ \\partial y$")
@@ -428,7 +471,7 @@ def plot_cases(cases,plot_name = ''):
         bbox_inches='tight'
     )
     fig_nondim.savefig(
-        'images/{0}_NonDimenaionalBoundaryLayerAnalysis_u.png'.format(plot_name),
+        'images/{0}_NonDimensionalBoundaryLayerAnalysis_u.png'.format(plot_name),
         bbox_inches='tight'
     )
     tar.write_to_csv_with_units(
@@ -436,7 +479,81 @@ def plot_cases(cases,plot_name = ''):
         "{0}_BoundaryLayerData_StereoPIV.csv".format(plot_name),
     )
 
+def analyze_edge_velocities(df):
+    from numpy import arange
+    import article2_time_averaged_routines as tar
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    reload(tar)
+
+    # This function was once used to evaluate the selection of 
+    # U_e based on different parameters
+
+    conditions = [
+        'vorticity_integration_rate_of_change',
+        #'u_rms_rate_of_change',
+        #'v_rms_rate_of_change',
+        #'u_rate_of_change',
+    ]
+
+    thresholds = arange(1,100,0.1)[::-1]
+
+    U_e_df = pd.DataFrame()
+    for c in conditions:
+        U_e = []
+        for t in thresholds:
+            U_e.append(tar.get_edge_velocity(df, condition = c, threshold = t))
+        U_e_df[c] = U_e
+
+    U_e_df.plot()
+    plt.axhline( df.u.max() )
+    plt.show()
+
+    return U_e_df
+
+def write_boundary_layers(cases):
+    import article2_time_averaged_routines as tar
+    from os.path import isfile,splitext,split
+    import pandas as pd
+
+    for case in cases.iterrows():
+        print "Processing {0}".format(case[1].file)
+
+        df_pickle_name = "ReservedData/{0}_{1}_{2}_{3}_{4}.p".format(
+            splitext(split(case[1].file)[1])[0],
+            case[1].x_loc,
+            case[1].rotation,
+            case[1].height_correction,
+            case[1].x_corr
+        )
+
+        if isfile(df_pickle_name):
+            df = pd.read_pickle(df_pickle_name)
+        else:
+            df = tar.get_wall_normal_line(
+                pickle_file               = case[1].file,
+                x_loc                     = case[1].x_loc,
+                variable                  = ['u','v',"u_rms","v_rms",],
+                plot                      = False,
+                rotation_angle            = case[1].rotation,
+                trust_y_min               = case[1].y_trust_min,
+                height_correction         = case[1].height_correction,
+                streamwise_correction     = case[1].x_corr,
+            )
+
+        df = tar.get_dimensionless_inner_variables(
+            df,
+            correction = 0,
+            Cf = case[1].Cf,
+        )
+
+        df['x_loc'] = case[1].x_loc
+
+
+        tar.write_boundary_layers(df)
+
 #get_streamlined_surface(z_loc = 0)
-#get_trailing_edge_for_all_cases_at_TE_m1()
-write_wall_normal_lines_to_csv()
-#get_trailing_edge_for_all_cases_at_x_m1()
+get_trailing_edge_for_all_cases_at_x_m1()
+get_trailing_edge_for_all_cases_at_TE_m1()
+#write_wall_normal_lines_to_csv()
+publish.publish()
