@@ -1,5 +1,7 @@
 import case_dict_overall_correction as case_dict
 import publish
+from os.path import isfile
+from os import remove
 
 cases_df = case_dict.return_case_df()
 #markers = ['o', 'v',  's', 'p', '^', '<', '>', '8',
@@ -223,6 +225,8 @@ def plot_cases(cases,plot_name = '', schematic = ''):
                                                 figsize=figsize )
     fig_v_rms    , axes_v_rms    = plt.subplots(1,1,sharex=True,sharey=True,
                                                 figsize=figsize )
+    fig_w        , axes_w        = plt.subplots(1,1,sharex=True,sharey=True,
+                                                figsize=figsize )
 
     df_all_cases = pd.DataFrame()
 
@@ -241,12 +245,13 @@ def plot_cases(cases,plot_name = '', schematic = ''):
 
         if isfile(df_pickle_name):
             df = pd.read_pickle(df_pickle_name)
-            print df_pickle_name
         else:
             df = tar.get_wall_normal_line(
                 pickle_file               = case[1].file,
                 x_loc                     = case[1].x_loc,
-                variable                  = ['u','v',"u_rms","v_rms",],
+                variable                  = ['u','v','w',"u_rms","v_rms",
+
+                                            ],
                 plot                      = False,
                 rotation_angle            = case[1].rotation,
                 trust_y_min               = case[1].y_trust_min,
@@ -341,7 +346,20 @@ def plot_cases(cases,plot_name = '', schematic = ''):
         )
 
         axes_v.plot(
-            df.v/20.,
+            df.v/U_e,
+            df.y+case[1].rotation,
+            label = case[1].case_name,
+            marker = case[1].marker,
+            markeredgewidth=markeredgewidth,
+            markerfacecolor = markerfacecolor,
+            markeredgecolor = color,
+            markersize      = markersize,
+            mew             = mew,
+            color = [float(f) for f in case[1].color.split(',')]
+        )
+
+        axes_w.plot(
+            df.w/U_e,
             df.y+case[1].rotation,
             label = case[1].case_name,
             marker = case[1].marker,
@@ -383,6 +401,7 @@ def plot_cases(cases,plot_name = '', schematic = ''):
     list_of_axes = [
         axes_u,
         axes_v,
+        axes_w,
         axes_v_rms,
         axes_u_rms,
         axes_diff,
@@ -393,6 +412,7 @@ def plot_cases(cases,plot_name = '', schematic = ''):
     list_of_figures = [
         fig_u,
         fig_v,
+        fig_w,
         fig_v_rms,
         fig_u_rms,
         fig_diff,
@@ -413,8 +433,8 @@ def plot_cases(cases,plot_name = '', schematic = ''):
     if schematic:
         im = plt.imread( get_sample_data( schematic  ) )
         for fig in list_of_figures:
-            if fig == fig_v_rms or fig == fig_u_rms :
-                newax = fig.add_axes([0.65, 0.55, 0.3, 0.3], anchor = 'SW', 
+            if fig == fig_v_rms or fig == fig_u_rms or fig == fig_w:
+                newax = fig.add_axes([0.55, 0.55, 0.3, 0.3], anchor = 'SW', 
                                      zorder=15)
             else:
                 newax = fig.add_axes([0.175, 0.55, 0.3, 0.3], anchor = 'SW', 
@@ -422,15 +442,19 @@ def plot_cases(cases,plot_name = '', schematic = ''):
             newax.imshow(im)
             newax.axis('off')
 
-    axes_u.set_xlabel("$\overline u/U_\\infty$")
+    axes_u.set_xlabel("$\overline u/U_e$")
     axes_u.set_ylabel("$y$ [mm]")
-    axes_u.set_xlim(0, 1)
-    axes_v.set_xlabel("$\overline v/U_\\infty$")
+    axes_u.set_xlim(0, 1.1)
+    axes_v.set_xlabel("$\overline v/U_e$")
     axes_v.set_ylabel("$y$ [mm]")
-    axes_u_rms.set_xlabel("$u'_\\textrm{rms}/U_\\infty$")
+    axes_w.set_xlabel("$\overline w/U_e$")
+    axes_w.set_ylabel("$y$ [mm]")
+    axes_w.set_xlim(-0.04, 0.04)
+    axes_w.set_xticks([-0.04, -0.02, 0, 0.02, 0.04])
+    axes_u_rms.set_xlabel("$u'_\\textrm{rms}/U_e$")
     axes_u_rms.set_ylabel("$y$ [mm]")
     axes_u_rms.set_xlim(0,0.12)
-    axes_v_rms.set_xlabel("$v'_\\textrm{rms}/U_\\infty$")
+    axes_v_rms.set_xlabel("$v'_\\textrm{rms}/U_e$")
     axes_v_rms.set_ylabel("$y$ [mm]")
     axes_v_rms.set_xlim(0,0.12)
     axes_diff.set_xlabel("$y$ [mm]")
@@ -441,6 +465,7 @@ def plot_cases(cases,plot_name = '', schematic = ''):
 
     axes_u.set_ylim(bottom = 0)
     axes_v.set_ylim(bottom = 0)
+    axes_w.set_ylim(bottom = 0)
     axes_u_rms.set_ylim(bottom = 0)
     axes_v_rms.set_ylim(bottom = 0)
     axes_diff.set_xlim(left = 0)
@@ -452,6 +477,10 @@ def plot_cases(cases,plot_name = '', schematic = ''):
     )
     fig_v.savefig(
         'images/{0}_BoundaryLayerAnalysis_v.png'.format(plot_name),
+        bbox_inches='tight'
+    )
+    fig_w.savefig(
+        'images/{0}_BoundaryLayerAnalysis_w.png'.format(plot_name),
         bbox_inches='tight'
     )
     fig_u_rms.savefig(
@@ -550,7 +579,11 @@ def write_boundary_layers(cases):
         df['x_loc'] = case[1].x_loc
 
 
-        tar.write_boundary_layers(df)
+        tar.write_boundary_layers(df, boundary_layers_file = bl_file)
+
+bl_file = "Boundary_layer_information.csv"
+if isfile(bl_file):
+    remove(bl_file)
 
 #get_streamlined_surface(z_loc = 0)
 get_trailing_edge_for_all_cases_at_x_m1()

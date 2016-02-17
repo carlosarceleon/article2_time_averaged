@@ -81,7 +81,7 @@ def return_case_df():
             'x_loc':             -1.0,
             'y_trust_min':       1.0,
             'Cf':                0.0015,
-            'height_correction': 0,
+            'height_correction': 0.5,
             'rotation':          0,
             'x_corr':            0,
             'marker':            'o',

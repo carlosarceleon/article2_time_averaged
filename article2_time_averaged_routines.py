@@ -230,7 +230,7 @@ def rename_df_columns_from_DaVis_to_standard(df):
           "Length_of_RMS_V"                   : "Length of RMS V",
           }
 
-    if not "Length_of_Avg_V" in df.columns:
+    if not "Avg_Vx" in df.columns:
         return df
 
     df.columns = [ DaVis_naming_dict[col] for col in df.columns ]
@@ -670,6 +670,9 @@ def get_wall_normal_line(pickle_file, x_loc,
         len(df.x.unique()),len(df.y.unique())
     )
 
+    df = rename_df_columns_from_DaVis_to_standard(df)
+    print df.head()
+
     df = correct_flow_plane_df(
         df, 
         rotation_angle, 
@@ -887,7 +890,7 @@ def write_boundary_layers(df,
         df = df.apply(pd.Series.interpolate)
         return df[ df.u == 0.99*U_e ].y.values[0]
 
-    def get_delta_displacement(df,U_e):
+    def get_delta_momentum(df,U_e):
         from scipy.integrate import simps
         return simps(
             ( df.u / U_e ) * (1 - df.u / U_e ), 
@@ -895,7 +898,7 @@ def write_boundary_layers(df,
             even='avg'
         )
 
-    def get_delta_momentum(df,U_e):
+    def get_delta_displacement(df,U_e):
         from scipy.integrate import simps
         return simps(
             1 - df.u / U_e , 
@@ -909,23 +912,36 @@ def write_boundary_layers(df,
     delta_displacement = get_delta_displacement(df,U_e)
     delta_momentum     = get_delta_momentum(df,U_e)
 
-    case_bl_df = pd.DataFrame( data = 
-                              {'trailing_edge':      trailing_edge,
-                               'phi':                phi,
-                               'alpha':              alpha,
-                               'z':                  z,
-                               'delta_99':           delta_99,
-                               'delta_displacement': delta_displacement,
-                               'delta_momentum':     delta_momentum,
-                               'x_loc':              df.x_loc.unique()[0]
-                              }, index = [0]
-                             )
+    case_bl_df = pd.DataFrame( 
+        data = 
+        {'Trailing edge'  : trailing_edge,
+         r'$\varphi$'     : phi,
+         r'$\alpha$'      : alpha,
+         r'$z/\lambda$'   : z,
+         r'$\delta_{99}$' : "{0:.1f}".format(delta_99),
+         r'$\delta^*$'    : "{0:.1f}".format(delta_displacement),
+         r'$\theta$'      : "{0:.1f}".format(delta_momentum),
+         'x loc'          : df.x_loc.unique()[0]
+        }, index = [0]
+    )
 
     if isfile(boundary_layers_file):
         bl_df = pd.read_csv(boundary_layers_file)
         bl_df = bl_df.append( case_bl_df )
         bl_df = bl_df.drop_duplicates()
         bl_df.to_csv( boundary_layers_file , index=False)
+        bl_df.to_latex( 
+            boundary_layers_file.replace('.csv','.tex') , 
+            index=False,
+            col_space = 2,
+            escape = False
+        )
     else:
         case_bl_df.to_csv( boundary_layers_file , index=False)
+        case_bl_df.to_latex( 
+            boundary_layers_file.replace('.csv','.tex') ,
+            index=False,
+            col_space = 2,
+            escape = False
+        )
 
