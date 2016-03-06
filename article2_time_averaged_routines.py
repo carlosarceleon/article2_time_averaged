@@ -77,13 +77,16 @@ def read_davis_tecplot_folder_and_rotate_to_serration_surface(tecplot_folder,
 
     if trailing_edge == 'serrated': device = 'Sr20R21'
     elif trailing_edge == 'straight': device = 'STE'
+    if 'tr' in tecplot_folder: time_resolved = True
+    else: time_resolved = False
 
-    df['case_name'] = "{0}_phi{1}_alpha{2}_U{3}_loc{4}_even_newer.dat".format(
+    df['case_name'] = "{0}_phi{1}_alpha{2}_U{3}_loc{4}.dat".format(
         device, phi, alpha, U, z
     )
+    if time_resolved:
+        df.case_name = df.case_name.unique()[0].replace('.dat','_tr.dat')
 
     mask = array(masks[df.case_name.unique()[0]])
-
 
     df.x = df.x - mask[1,0]
     df.y = df.y - mask[1,1]
@@ -91,13 +94,12 @@ def read_davis_tecplot_folder_and_rotate_to_serration_surface(tecplot_folder,
     data_shape = (
         len(df.y.unique()),len(df.x.unique())
     )
-    print data_shape
 
     mask_rotation = get_angle_between_points(
         mask[1], mask[2]
     )
 
-    df = rotate_df( df, mask_rotation )
+    df = rotate_df( df, -mask_rotation )
 
     # Regrid ###################################################################
     df = regrid_df(
@@ -549,11 +551,14 @@ def rotate_df(df,degrees = 0):
             + df['Reynold_stress_vv']*cos(angle)**2\
             - 2.*cos(angle)*sin(angle)*df['Reynold_stress_uv']
 
+    #df_rotated['Reynold_stress_uv'] = \
+    #        df['Reynold_stress_uv']*cos(2*angle) \
+    #        + (cos(angle)*sin(angle)) \
+    #        * ( df['Reynold_stress_uu']**2 * -df['Reynold_stress_vv']**2 )
     df_rotated['Reynold_stress_uv'] = \
             df['Reynold_stress_uv']*cos(2*angle) \
             + (cos(angle)*sin(angle)) \
-            * ( df['Reynold_stress_uu']**2\
-               * -df['Reynold_stress_vv']**2)
+            * ( df['Reynold_stress_uu'] - df['Reynold_stress_vv'] )
 
     df_rotated['u_rms'] = sqrt(
         df_rotated['Reynold_stress_uu'].fillna(0).values
@@ -660,6 +665,7 @@ def get_wall_normal_line(pickle_file, x_loc,
 
     df = load_df_from_pickle(pickle_file)
 
+
     mask = return_mask(df.case_name.unique()[0])
     mask_rotation = get_angle_between_points(
         mask[:,1], mask[:,2]
@@ -671,7 +677,6 @@ def get_wall_normal_line(pickle_file, x_loc,
     )
 
     df = rename_df_columns_from_DaVis_to_standard(df)
-    print df.head()
 
     df = correct_flow_plane_df(
         df, 
@@ -831,7 +836,8 @@ def write_to_csv_with_units(df,csv_file_name):
 
 def get_edge_velocity(df, 
                       condition = 'vorticity_integration_rate_of_change', 
-                      threshold = 1.00
+                      threshold = 1.00,
+                      Ue_file = 'Ue_data.csv',
                      ):
     from scipy.integrate import simps
     from numpy import diff
@@ -877,12 +883,8 @@ def get_edge_velocity(df,
 
     return U_edge
 
-def write_boundary_layers(df, 
-                          boundary_layers_file = 'boundary_layers_file.csv'):
+def get_boundary_layer_values( df ):
     import pandas as pd
-    from os.path import isfile
-
-    trailing_edge,phi,alpha,U,z = decript_case_name(df.case_name.unique()[0])
 
     def get_delta_99(df,U_e):
         df = df.append( {'u' : 0.99*U_e} , ignore_index = True)
@@ -912,7 +914,20 @@ def write_boundary_layers(df,
     delta_displacement = get_delta_displacement(df,U_e)
     delta_momentum     = get_delta_momentum(df,U_e)
 
-    case_bl_df = pd.DataFrame( 
+    return U_e, delta_99, delta_displacement, delta_momentum
+
+
+def write_boundary_layers(df, 
+                          boundary_layers_file = 'boundary_layers_file.csv'):
+    import pandas as pd
+    from os.path import isfile
+
+    trailing_edge,phi,alpha,U,z = decript_case_name(df.case_name.unique()[0])
+
+    U_e, delta_99, delta_displacement, delta_momentum = \
+            get_boundary_layer_values(df)
+
+    case_bl_df_tex = pd.DataFrame( 
         data = 
         {'Trailing edge'  : trailing_edge,
          r'$\varphi$'     : phi,
@@ -921,24 +936,42 @@ def write_boundary_layers(df,
          r'$\delta_{99}$' : "{0:.1f}".format(delta_99),
          r'$\delta^*$'    : "{0:.1f}".format(delta_displacement),
          r'$\theta$'      : "{0:.1f}".format(delta_momentum),
-         'x loc'          : df.x_loc.unique()[0]
+         'x loc'          : df.x_loc.unique()[0],
+         r'U e'           : U_e,
+        }, index = [0]
+    )
+    case_bl_df_csv = pd.DataFrame( 
+        data = 
+        {'Trailing_edge':  trailing_edge,
+         'phi':            phi,
+         'alpha':          alpha,
+         'z_loc':          z,
+         'delta_99':       "{0:.1f}".format(delta_99),
+         'delta_disp':     "{0:.1f}".format(delta_displacement),
+         'delta_momentum': "{0:.1f}".format(delta_momentum),
+         'x_loc':          df.x_loc.unique()[0],
+         'Ue':             U_e,
         }, index = [0]
     )
 
     if isfile(boundary_layers_file):
-        bl_df = pd.read_csv(boundary_layers_file)
-        bl_df = bl_df.append( case_bl_df )
-        bl_df = bl_df.drop_duplicates()
-        bl_df.to_csv( boundary_layers_file , index=False)
-        bl_df.to_latex( 
+        bl_df_csv = pd.read_csv(boundary_layers_file)
+        bl_df_csv = bl_df_csv.append( case_bl_df_csv )
+        bl_df_csv = bl_df_csv.drop_duplicates()
+        bl_df_csv.to_csv( boundary_layers_file , index=False)
+
+        bl_df_tex = pd.read_csv(boundary_layers_file)
+        bl_df_tex = bl_df_tex.append( case_bl_df_tex )
+        bl_df_tex = bl_df_tex.drop_duplicates()
+        bl_df_tex.to_latex( 
             boundary_layers_file.replace('.csv','.tex') , 
             index=False,
             col_space = 2,
             escape = False
         )
     else:
-        case_bl_df.to_csv( boundary_layers_file , index=False)
-        case_bl_df.to_latex( 
+        case_bl_df_csv.to_csv( boundary_layers_file , index=False)
+        case_bl_df_tex.to_latex( 
             boundary_layers_file.replace('.csv','.tex') ,
             index=False,
             col_space = 2,

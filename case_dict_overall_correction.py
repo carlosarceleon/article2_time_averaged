@@ -59,20 +59,20 @@ def return_case_df():
             'marker':            '+',
             'color':             '0.8352941176470589, 0.3686274509803922, 0.0'
         },
-        {
-            'file':              \
-            'data/Sr20R21_phi0_alpha0_U20_loc10.dat.p',
-            'case_name':         'Serrated, $z/\\lambda = 0.5$',
-            'type':              'surface',
-            'x_loc':             -1.0,
-            'y_trust_min':       1.0,
-            'Cf':                0.0015,
-            'height_correction': z10_height_correction,
-            'rotation':          z10_rotation_correction,
-            'x_corr':            z10_x_correction,
-            'marker':            'o',
-            'color':             '0.8, 0.4745098039215686, 0.6549019607843137'
-        },
+        #{
+        #    'file':              \
+        #    'data/Sr20R21_phi0_alpha0_U20_loc10.dat.p',
+        #    'case_name':         'Serrated, $z/\\lambda = 0.5$',
+        #    'type':              'surface',
+        #    'x_loc':             -1.0,
+        #    'y_trust_min':       1.0,
+        #    'Cf':                0.0015,
+        #    'height_correction': z10_height_correction,
+        #    'rotation':          z10_rotation_correction,
+        #    'x_corr':            z10_x_correction,
+        #    'marker':            'o',
+        #    'color':             '0.8, 0.4745098039215686, 0.6549019607843137'
+        #},
         {
             'file':              \
             'data/Sr20R21_phi0_alpha0_U20_loc10_even_newer.dat.p',
