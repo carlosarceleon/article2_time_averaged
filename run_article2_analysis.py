@@ -289,28 +289,28 @@ def get_trailing_edge_for_all_TR_cases_at_TE_m1():
         (cases_df.file == \
          'data/Sr20R21_phi0_alpha0_U20_loc10_tr.dat.p')&\
         (cases_df.x_loc == -1) ]
-    case_z00_2 = cases_df[ 
-        (cases_df.file == 'data/Sr20R21_phi0_alpha0_U20_loc00_tr.dat.p')&\
-        (cases_df.x_loc == 34) ]
-    case_z05_2 = cases_df[ 
-        (cases_df.file == 'data/Sr20R21_phi0_alpha0_U20_loc05_tr.dat.p')&\
-        (cases_df.x_loc == 14) ]
-    case_z10_2 = cases_df[ 
-        (cases_df.file == \
-         'data/Sr20R21_phi0_alpha0_U20_loc10_tr.dat.p')&\
-        (cases_df.x_loc == 3) ]
-    case_z10_2 = cases_df[ 
-        (cases_df.file == \
-         'data/Sr20R21_phi0_alpha0_U20_loc10_tr.dat.p')&\
-        (cases_df.x_loc == -5) ]
+    #case_z00_2 = cases_df[ 
+    #    (cases_df.file == 'data/Sr20R21_phi0_alpha0_U20_loc00_tr.dat.p')&\
+    #    (cases_df.x_loc == 34) ]
+    #case_z05_2 = cases_df[ 
+    #    (cases_df.file == 'data/Sr20R21_phi0_alpha0_U20_loc05_tr.dat.p')&\
+    #    (cases_df.x_loc == 14) ]
+    #case_z10_2 = cases_df[ 
+    #    (cases_df.file == \
+    #     'data/Sr20R21_phi0_alpha0_U20_loc10_tr.dat.p')&\
+    #    (cases_df.x_loc == 3) ]
+    #case_z10_2 = cases_df[ 
+    #    (cases_df.file == \
+    #     'data/Sr20R21_phi0_alpha0_U20_loc10_tr.dat.p')&\
+    #    (cases_df.x_loc == -5) ]
 
     cases = case_STE
     cases = cases.append(case_z00, ignore_index = True)
     cases = cases.append(case_z05, ignore_index = True)
     cases = cases.append(case_z10, ignore_index = True)
-    cases = cases.append(case_z00_2, ignore_index = True)
-    cases = cases.append(case_z05_2, ignore_index = True)
-    cases = cases.append(case_z10_2, ignore_index = True)
+    #cases = cases.append(case_z00_2, ignore_index = True)
+    #cases = cases.append(case_z05_2, ignore_index = True)
+    #cases = cases.append(case_z10_2, ignore_index = True)
 
     schematic = '/home/carlos/Documents/PhD/Articles/Article_2/'+\
             'Figures/measurement_locations_TE_m2.png'
@@ -407,7 +407,7 @@ def get_trailing_edge_for_all_cases_at_x_m1():
     write_boundary_layers(cases)
     plot_cases( cases , plot_name = "At_x_m1", schematic = schematic)
 
-def plot_cases(cases,plot_name = '', schematic = '', time_resolved = False):
+def plot_cases(cases, plot_name = '', schematic = '', time_resolved = False):
     import article2_time_averaged_routines as tar
     import matplotlib.pyplot as plt
     from matplotlib import rc
@@ -459,6 +459,8 @@ def plot_cases(cases,plot_name = '', schematic = '', time_resolved = False):
                                                 figsize=figsize )
 
     df_all_cases = pd.DataFrame()
+
+    Um_df = pd.DataFrame()
 
     for case in cases.iterrows():
         print "Processing {0}".format(case[1].file)
@@ -522,6 +524,16 @@ def plot_cases(cases,plot_name = '', schematic = '', time_resolved = False):
             markersize      = markersize,
             mew             = mew,
             color = [float(f) for f in case[1].color.split(',')]
+        )
+
+        Um_df = pd.concat([  Um_df, 
+            pd.DataFrame( data = {
+                (splitext(split(case[1].file)[1])[0], 'u') : df.u/U_e,
+                (splitext(split(case[1].file)[1])[0], 'u_real') : df.u,
+                (splitext(split(case[1].file)[1])[0], 'v_real') : df.v,
+                (splitext(split(case[1].file)[1])[0], 'ybl') : df.y/delta_99,
+                (splitext(split(case[1].file)[1])[0], 'y_real') : df.y
+            }, index = range(len(df.u.values)) ) ] , axis = 1
         )
 
         axes_u_rms.plot(
@@ -690,7 +702,7 @@ def plot_cases(cases,plot_name = '', schematic = '', time_resolved = False):
             newax.imshow(im)
             newax.axis('off')
 
-    ylabel = r'$y / \delta_{99}$'
+    ylabel = r'$y / \delta$'
     axes_u.set_xlabel("$\overline u/u_e$")
     axes_u.set_ylabel(ylabel)
     axes_u.set_xlim(0, 1.1)
@@ -766,6 +778,8 @@ def plot_cases(cases,plot_name = '', schematic = '', time_resolved = False):
         df_all_cases,
         "{0}_BoundaryLayerData_StereoPIV.csv".format(plot_name),
     )
+
+    Um_df.to_pickle( 'Um.p' )
 
 def analyze_edge_velocities(df):
     from numpy import arange
@@ -849,10 +863,10 @@ if isfile(bl_file):
 #get_tr_streamlined_surface(z_loc = 0)
 
 #get_trailing_edge_for_all_cases_at_TE_m1()
-#get_trailing_edge_for_all_cases_at_x_m1()
+get_trailing_edge_for_all_cases_at_x_m1()
 
-get_trailing_edge_for_all_TR_cases_at_TE_m1()
+#get_trailing_edge_for_all_TR_cases_at_TE_m1()
 #get_trailing_edge_for_all_TR_cases_at_x_m1()
 
 #write_wall_normal_lines_to_csv()
-#publish.publish()
+publish.publish()
