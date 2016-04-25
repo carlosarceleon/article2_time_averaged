@@ -499,6 +499,10 @@ def plot_cases(cases, plot_name = '', schematic = '', time_resolved = False):
             correction = 0,
             Cf = case[1].Cf,
         )
+        
+        if 'Sr20R21_phi0_alpha0_U20_loc00' in case[1].file:
+            print 'applying correction'
+            df = df[ df.y > 0.8 ]
 
         axes_nondim.plot(
             df.y_plus,
@@ -536,6 +540,10 @@ def plot_cases(cases, plot_name = '', schematic = '', time_resolved = False):
             }, index = range(len(df.u.values)) ) ] , axis = 1
         )
 
+        if 'Sr20R21_phi0_alpha0_U20_loc05' in case[1].file:
+            print 'applying correction'
+            df = df[ df.y > 0.8 ]
+
         axes_u_rms.plot(
             df.u_rms/U_e,
             df.y/delta_99,
@@ -546,8 +554,17 @@ def plot_cases(cases, plot_name = '', schematic = '', time_resolved = False):
             markeredgecolor = color,
             markersize      = markersize,
             mew             = mew,
-            color = [float(f) for f in case[1].color.split(',')]
+            color = [float(f) for f in case[1].color.split(',')],
+            ls = ''
         )
+
+        #axes_u_rms.fill_betweenx(
+        #    df.y/delta_99,
+        #    df.u_rms/U_e * 0.98,
+        #    df.u_rms/U_e * 1.02,
+        #    color = 'k',#[float(f) for f in case[1].color.split(',')],
+        #    alpha = 0.3
+        #)
 
         axes_v_rms.plot(
             df.v_rms/U_e,
@@ -559,8 +576,17 @@ def plot_cases(cases, plot_name = '', schematic = '', time_resolved = False):
             markeredgecolor = color,
             markersize      = markersize,
             mew             = mew,
-            color = [float(f) for f in case[1].color.split(',')]
+            color = [float(f) for f in case[1].color.split(',')],
+            ls = ''
         )
+
+        #axes_v_rms.fill_betweenx(
+        #    df.y/delta_99,
+        #    df.v_rms/U_e * 0.98,
+        #    df.v_rms/U_e * 1.02,
+        #    color = 'k',#[float(f) for f in case[1].color.split(',')],
+        #    alpha = 0.5
+        #)
 
         axes_diff.plot(
             df.y.values[0:-1],
@@ -862,8 +888,8 @@ if isfile(bl_file):
 
 #get_tr_streamlined_surface(z_loc = 0)
 
-#get_trailing_edge_for_all_cases_at_TE_m1()
-get_trailing_edge_for_all_cases_at_x_m1()
+get_trailing_edge_for_all_cases_at_TE_m1()
+#get_trailing_edge_for_all_cases_at_x_m1()
 
 #get_trailing_edge_for_all_TR_cases_at_TE_m1()
 #get_trailing_edge_for_all_TR_cases_at_x_m1()
